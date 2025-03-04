@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simple Speed Typer</title>
+    <style>
+        body {
+            background-color: #fe9801;
+            color: black;
+            text-align: center;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .heading {
+            margin-bottom: 20px;
+            font-size: 3rem;
+            color: black;
+        }
+
+        .header {
+            display: flex;
+            align-items: center;
+        }
+
+        .timer,
+        .errors,
+        .accuracy,
+        .cpm,
+        .wpm {
+            background-color: #ccda46;
+            height: 60px;
+            width: 70px;
+            margin: 8px;
+            padding: 12px;
+            border-radius: 20%;
+            box-shadow: black 5px 8px 5px;
+        }
+
+        .cpm,
+        .wpm {
+            display: none;
+        }
+
+        .header_text {
+            text-transform: uppercase;
+            font-size: 0.6rem;
+            font-weight: 600;
+        }
+
+        .curr_time,
+        .curr_errors,
+        .curr_accuracy,
+        .curr_cpm,
+        .curr_wpm {
+            font-size: 2.75rem;
+        }
+
+        .quote {
+            background-color: #ccda46;
+            font-size: 1.5rem;
+            margin: 10px;
+            padding: 25px;
+            box-shadow: black 5px 8px 5px;
+        }
+
+        .input_area {
+            background-color: #f5f5c6;
+            height: 80px;
+            width: 40%;
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin: 15px;
+            padding: 20px;
+            border: 0;
+            box-shadow: black 5px 8px 5px;
+        }
+
+        .restart_btn {
+            display: none;
+            background-color: #326765;
+            font-size: 1.5rem;
+            padding: 10px;
+            border: 0;
+            box-shadow: black 5px 8px 5px;
+        }
+
+        .incorrect_char {
+            color: red;
+            text-decoration: underline;
+        }
+
+        .correct_char {
+            color: darkgreen;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <div class="heading">Simple Speed Typing</div>
+        <div class="header">
+            <div class="wpm">
+                <div class="header_text">WPM</div>
+                <div class="curr_wpm">100</div>
+            </div>
+            <div class="cpm">
+                <div class="header_text">CPM</div>
+                <div class="curr_cpm">100</div>
+            </div>
+            <div class="errors">
+                <div class="header_text">Errors</div>
+                <div class="curr_errors">0</div>
+            </div>
+            <div class="timer">
+                <div class="header_text">Time</div>
+                <div class="curr_time">60s</div>
+            </div>
+            <div class="accuracy">
+                <div class="header_text">% Accuracy</div>
+                <div class="curr_accuracy">100</div>
+            </div>
+        </div>
+        <div class="quote">Click on the area below to start the game.</div>
+        <textarea class="input_area" placeholder="start typing here..." oninput="processCurrentText()"
+            onfocus="startGame()"></textarea>
+        <button class="restart_btn" onclick="resetValues()">Restart</button>
+    </div>
+
+    <div class="leaderboard" style="background: #ccda46; padding: 10px; margin-top: 20px; box-shadow: black 5px 8px 5px;"></div>
+    
+    <script>
+        async function loadLeaderboard() {
+            try {
+                const response = await fetch("http://localhost:5000/leaderboard");
+                const leaderboard = await response.json();
+
+                let leaderboardContainer = document.querySelector(".leaderboard");
+                leaderboardContainer.innerHTML = "<h2>🏆 Leaderboard 🏆</h2>";
+
+                leaderboard.forEach((player, index) => {
+                    let entry = document.createElement("p");
+                    entry.textContent = `${index + 1}. ${player.username} - ${player.wpm} WPM, ${player.accuracy}% Accuracy`;
+                    leaderboardContainer.appendChild(entry);
+                });
+            } catch (error) {
+                console.error("Error fetching leaderboard:", error);
+            }
+        }
+
+
+        let TIME_LIMIT = 60, quotes_array = ["Push yourself, because no one else is going to do it for you.", "Failure is the condiment that gives success its flavor.", "Wake up with determination. Go to bed with satisfaction.", "It's going to be hard, but hard does not mean impossible.", "Learning never exhausts the mind.", "The only way to do great work is to love what you do."];
+        let timer_text = document.querySelector(".curr_time"), accuracy_text = document.querySelector(".curr_accuracy"), error_text = document.querySelector(".curr_errors"), cpm_text = document.querySelector(".curr_cpm"), wpm_text = document.querySelector(".curr_wpm"), quote_text = document.querySelector(".quote"), input_area = document.querySelector(".input_area"), restart_btn = document.querySelector(".restart_btn"), cpm_group = document.querySelector(".cpm"), wpm_group = document.querySelector(".wpm");
+        let timeLeft = TIME_LIMIT, timeElapsed = 0, total_errors = 0, errors = 0, characterTyped = 0, current_quote = "", quoteNo = 0, timer = null;
+        async function updateQuote() {
+            try {
+                const response = await fetch("http://localhost:5000/get-quote");
+                const data = await response.json();
+                quote_text.textContent = data.quote;
+            } catch (error) {
+                console.error("Error fetching quote:", error);
+            }
+        }
+
+        function processCurrentText() { let curr_input = input_area.value, curr_input_array = curr_input.split(''); characterTyped++; errors = 0; quote_text.querySelectorAll('span').forEach((char, index) => { let typedChar = curr_input_array[index]; if (!typedChar) { char.classList.remove('correct_char', 'incorrect_char'); } else if (typedChar === char.innerText) { char.classList.add('correct_char'); char.classList.remove('incorrect_char'); } else { char.classList.add('incorrect_char'); char.classList.remove('correct_char'); errors++; } }); error_text.textContent = total_errors + errors; accuracy_text.textContent = Math.round(((characterTyped - (total_errors + errors)) / characterTyped) * 100); if (curr_input.length == current_quote.length) { updateQuote(); total_errors += errors; input_area.value = ""; } }
+        function startGame() { resetValues(); updateQuote(); clearInterval(timer); timer = setInterval(updateTimer, 1000); }
+        function resetValues() { timeLeft = TIME_LIMIT; timeElapsed = 0; errors = 0; total_errors = 0; characterTyped = 0; quoteNo = 0; input_area.disabled = false; input_area.value = ""; quote_text.textContent = 'Click on the area below to start the game.'; accuracy_text.textContent = 100; timer_text.textContent = timeLeft + 's'; error_text.textContent = 0; restart_btn.style.display = "none"; cpm_group.style.display = "none"; wpm_group.style.display = "none"; }
+        function updateTimer() { if (timeLeft > 0) { timeLeft--; timeElapsed++; timer_text.textContent = timeLeft + "s"; } else { finishGame(); } }
+        async function finishGame() {
+            clearInterval(timer);
+            input_area.disabled = true;
+            quote_text.textContent = "Click on restart to start a new game.";
+            restart_btn.style.display = "block";
+
+            let cpm = Math.round(((characterTyped / timeElapsed) * 60));
+            let wpm = Math.round((((characterTyped / 5) / timeElapsed) * 60));
+
+            cpm_text.textContent = cpm;
+            wpm_text.textContent = wpm;
+
+            cpm_group.style.display = "block";
+            wpm_group.style.display = "block";
+
+            // Ask for player's name
+            let username = prompt("Enter your name for the leaderboard:");
+            if (username) {
+                await fetch("http://localhost:5000/submit-score", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ username, wpm, accuracy: accuracy_text.textContent }),
+                });
+                loadLeaderboard();
+            }
+        }
+
+    </script>
+</body>
+
+</html>
